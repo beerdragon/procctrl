@@ -1,0 +1,66 @@
+.\" Process this file with
+.\" groff -man -Tascii procctrl.1
+.\"
+.TH PROCCTRL 1 "MAY 2014" Linux "User Manuals"
+.SH NAME
+procctrl \- Process spawning and control utility
+.SH SYNOPSIS
+.BI "procctrl [-d " "path" "] [-h " "mode" "] [-K] [-k " "identifier" "] [-P " "pid" "] [-p] [-v] " "operation command [...]"
+.SH DESCRIPTION
+.B procctrl
+can be used to start a process, and later stop it, by referencing it
+symbolically instead of by process id. Additionally, a "parent" process can
+be monitored and the spawned process killed when that parent terminates.
+
+This is typically used for integration test harnesses using, for example,
+Maven or Ant. If a server process required for the test can be started using
+this utility then it will be killed whenever the parent build/test process
+terminates. This avoids the problem of rogue processes remaining after failed
+or aborted builds/tests.
+.SH OPTIONS
+.IP "-d path"
+Use a specific directory for process tracking information. If omitted the
+default
+.I ~/.procctrl
+directory is used.
+.IP "-h mode"
+Specify the housekeeping mode - whether to delete files from the tracking
+directory. Possible values are 0 (no actions), 1 (clean up before), 2 (clean
+up after), 3 (clean up before and after operation).
+.IP -K
+Use a global process identifier (
+.B -k
+) symbol within the tracking folder instead of one scoped within the parent
+process identifier. This can be used for sharing a spawned process among
+concurrent build/test operations.
+.IP "-k identifier"
+Specify the symbolic process name. If omitted the default name is based on the
+command and parameters.
+.IP "-P pid"
+Override the parent process identifier (pid). If omitted the parent identifier
+used will be the pid of the process that launched
+.B procctrl
+.IP -p
+Watch the parent process and kill the spawned process if the parent
+terminates.
+.IP -v
+Verbose mode, writing out debugging information to stdout.
+.IP operation
+The action to perform, possible values are
+.I start
+,
+.I stop
+and 
+.I query
+.IP "command [...]"
+The command to run. When used with the
+.I start
+action this will be spawned. When used with the
+.I stop
+or
+.I query
+actions this will be used to identify the process unless a symbolic identifier
+has been specified with
+.B -k
+.SH AUTHOR
+Andrew Ian William Griffin <griffin@beerdragon.co.uk>
