@@ -5,7 +5,7 @@
 .SH NAME
 procctrl \- Process spawning and control utility
 .SH SYNOPSIS
-.BI "procctrl [-d " "path" "] [-h " "mode" "] [-K] [-k " "identifier" "] [-P " "pid" "] [-p] [-v] " "operation command [...]"
+.BI "procctrl [-d " "path" "] [-H " "mode" "] [-K] [-k " "identifier" "] [-P " "pid" "] [-p] [-v] " "operation command [...]"
 .SH DESCRIPTION
 .B procctrl
 can be used to start a process, and later stop it, by referencing it
@@ -23,7 +23,7 @@ Use a specific directory for process tracking information. If omitted the
 default
 .I ~/.procctrl
 directory is used.
-.IP "-h mode"
+.IP "-H mode"
 Specify the housekeeping mode - whether to delete files from the tracking
 directory. Possible values are 0 (no actions), 1 (clean up before), 2 (clean
 up after), 3 (clean up before and after operation).

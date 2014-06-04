@@ -1,3 +1,3 @@
 AUTOMAKE_OPTIONS = foreign
 SUBDIRS = src man
-TESTS = src/testall
+TESTS = src/unittest

@@ -52,6 +52,7 @@ top-level directory (that is, the one containing this file).
 
   * autoconf
   * automake
+  * autoheader
   * ./configure
   * make check
 

@@ -19,6 +19,47 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+/// @brief Waits for the child to call execvp
+///
+/// After the initial fork, the identity of the child does not correspond to
+/// its final identity. This function blocks until the child terminates or its
+/// identity changes.
+///
+/// @return zero if successful, otherwise a non-zero error code
+int _wait_for_execvp (
+    pid_t child ///<the child PID>
+    ) {
+    char tmp[32];
+    FILE *cmdSelf, *cmdChild;
+    int result = EBUSY;
+    if (snprintf (tmp, sizeof (tmp), "/proc/%u/cmdline", child) >= sizeof (tmp)) return ENOMEM;
+    do {
+        cmdSelf = fopen ("/proc/self/cmdline", "rt");
+        if (cmdSelf) {
+            cmdChild = fopen (tmp, "rt");
+            if (cmdChild) {
+                while (!feof (cmdSelf) && !feof (cmdChild)) {
+                    if (fgetc (cmdSelf) != fgetc (cmdChild)) {
+                        // Command lines differ
+                        result = 0;
+                        break;
+                    }
+                }
+                fclose (cmdChild);
+            } else {
+                // Child terminated
+                result = 0;
+            }
+            fclose (cmdSelf);
+        } else {
+            // Internal error; can't get our own command line
+            result = EINVAL;
+        }
+        if (result != EBUSY) return result;
+        sleep (1);
+    } while (1);
+}
+
 /// @brief Starts the child process
 ///
 /// If there is not already an active process with the symbolic identifier
@@ -39,6 +80,7 @@ int operation_start () {
         if (process) {
             if (process == (pid_t)-1) return errno;
             if (verbose) fprintf (stdout, "Child process %u spawned\n", process);
+            _wait_for_execvp (process);
             e = process_save (process);
             if (e) {
                 fprintf (stderr, "Couldn't write process information, error %d\n", e);
@@ -53,6 +95,7 @@ int operation_start () {
                         if (verbose) fprintf (stdout, "Killing child process on parent termination\n");
                         kill_process (process);
                     }
+                    exit (0);
                 }
             }
             return 0;

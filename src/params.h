@@ -52,9 +52,10 @@ MODULE_VAR_EXTERN char const * MODULE_VAR_CONST operation;
 MODULE_VAR_EXTERN int MODULE_VAR_CONST spawn_argc;
 /// @brief The spawn arguments (the first is the process to spawn)
 MODULE_VAR_EXTERN char ** MODULE_VAR_CONST spawn_argv;
-/// @brief The `h` parameter
+/// @brief The `H` parameter
 MODULE_VAR_EXTERN int MODULE_VAR_CONST housekeep_mode;
 
 int params (int argc, char **argv);
+int params_v (int argc, ...);
 
 #endif /* ifndef __inc_params_h */

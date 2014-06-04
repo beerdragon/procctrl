@@ -10,7 +10,8 @@
 
 #include "operations.h"
 #include "params.h"
-#include "errno.h"
+#include "process.h"
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -26,10 +27,10 @@ int operation_query () {
     if (verbose) fprintf (stdout, "Querying spawned process\n");
     process = process_find ();
     if (process) {
-        fprintf (stdout, "Process %u is running\n", process);
+        if (verbose) fprintf (stdout, "Process %u is running\n", process);
         return 0;
     } else {
-        fprintf (stdout, "No child process is running\n");
+        if (verbose) fprintf (stdout, "No child process is running\n");
         return ESRCH;
     }
 }

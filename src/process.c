@@ -18,6 +18,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/file.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 /// @brief The longest line that can be present in an information file
 ///
@@ -25,6 +28,8 @@
 /// line plus the "cmd: " prefix or the verify_pid(const char*,pid_t) function
 /// will not work.
 #define MAX_PROCESS_INFO_LINE    256
+
+int _is_running (pid_t process);
 
 /// @brief Checks a PID corresponds to the expected command line
 ///
@@ -79,17 +84,68 @@ static int verify_pid (
     return verified;
 }
 
+/// @brief File handle used to manage the data_dir lock
+static int _lock_fd = -1;
+
+/// @brief Obtains the data_dir lock
+///
+/// Use of the directory should be done while holding the lock. Race
+/// conditions may otherwise occur. For example, process A running the
+/// housekeeping routine may delete a directory process B created before
+/// B could write the info file; B will then be unable to write the file.
+///
+/// This call will block until the lock can be claimed.
+///
+/// The caller must use unlock_data_dir() to release the lock when it is
+/// finished.
+static void lock_data_dir () {
+    size_t size;
+    char *path;
+    if (_lock_fd != -1) abort ();
+    size = strlen (data_dir) + 7;
+    path = (char*)malloc (size);
+    if (!path) abort ();
+    sprintf (path, "%s/.lock", data_dir);
+    _lock_fd = open (path, O_WRONLY | O_CREAT);
+    free (path);
+    if (_lock_fd != -1) {
+        flock (_lock_fd, LOCK_EX);
+    }
+}
+
+/// @brief Releases the data_dir lock
+///
+/// See the description for lock_data_dir() for details.
+static void unlock_data_dir () {
+    if (_lock_fd != -1) {
+        char *path;
+        size_t size;
+        flock (_lock_fd, LOCK_UN);
+        close (_lock_fd);
+        size = strlen (data_dir) + 7;
+        path = (char*)malloc (size);
+        if (!path) abort ();
+        sprintf (path, "%s/.lock", data_dir);
+        unlink (path);
+        free (path);
+    }
+    _lock_fd = -1;
+}
+
 /// @brief Cleans up the data folder
 ///
 /// Scans the data folder, checking that any information files correspond to
 /// active processes. Any files that cannot be matched to processes (for
 /// example a process has terminated) are deleted.
-void process_housekeep () {
+///
+/// @return zero if the housekeep was run, non-zero if there was an issue
+int process_housekeep () {
     DIR *dir;
     struct dirent *ent;
-    if (verbose) fprintf (stdout, "Cleaning up data area\n");
+    if (verbose) fprintf (stdout, "Cleaning up data area (%s)\n", data_dir);
     dir = opendir (data_dir);
-    if (!dir) return;
+    if (!dir) return ENOENT;
+    lock_data_dir ();
     while ((ent = readdir (dir)) != NULL) {
         DIR *subdir;
         char *dirpath, *subdirpath;
@@ -97,11 +153,15 @@ void process_housekeep () {
         if (ent->d_name[0] == '.') continue;
         size = strlen (ent->d_name) + strlen (data_dir) + 2;
         dirpath = (char*)malloc (size);
-        if (!dirpath) abort ();
+        if (!dirpath) {
+            closedir (dir);
+            unlock_data_dir ();
+            return ENOMEM;
+        }
         sprintf (dirpath, "%s/%s", data_dir, ent->d_name);
         if (isdigit (*ent->d_name)) {
             pid_t ppid = (pid_t)strtol (ent->d_name, NULL, 10);
-            if (kill (ppid, 0) != 0) {
+            if (_is_running (ppid) == 0) {
                 if (verbose) fprintf (stdout, "Deleting %s - invalid\n", dirpath);
                 subdir = opendir (dirpath);
                 if (subdir) {
@@ -156,13 +216,15 @@ void process_housekeep () {
                             }
                             if (!cmdline || !process || !verify_pid (cmdline, process)) {
                                 if (verbose) fprintf (stdout, "Deleting %s - invalid\n", subdirpath);
+                                fclose (info);
+                                info = NULL;
                                 unlink (subdirpath);
                                 files--;
                             }
                             if (cmdline) free (cmdline);
                             free (tmp);
                         }
-                        fclose (info);
+                        if (info) fclose (info);
                     }
                     free (subdirpath);
                 }
@@ -176,6 +238,8 @@ void process_housekeep () {
         free (dirpath);
     }
     closedir (dir);
+    unlock_data_dir ();
+    return 0;
 }
 
 /// @brief Calculates the length of a PID if expressed as a decimal
@@ -310,8 +374,9 @@ static char *get_process_path (
 pid_t process_find () {
     char *path = get_process_path (0);
     FILE *info;
-    pid_t pid;
+    pid_t pid = 0;
     if (verbose) fprintf (stdout, "Checking for process at %s\n", path);
+    lock_data_dir ();
     info = fopen (path, "rt");
     if (info) {
         char *tmp = (char*)malloc (MAX_PROCESS_INFO_LINE);
@@ -333,13 +398,10 @@ pid_t process_find () {
                 free (cmd);
             }
             free (tmp);
-        } else {
-            pid = 0;
         }
         fclose (info);
-    } else {
-        pid = 0;
     }
+    unlock_data_dir ();
     free (path);
     return pid;
 }
@@ -353,9 +415,11 @@ pid_t process_find () {
 int process_save (
     pid_t process ///<the PID of the controlled process>
     ) {
-    char *path = get_process_path (1);
+    char *path;
     FILE *info;
     int result;
+    lock_data_dir ();
+    path = get_process_path (1);
     if (verbose) fprintf (stdout, "Writing state to %s\n", path);
     info = fopen (path, "wt");
     if (info) {
@@ -373,6 +437,7 @@ int process_save (
     } else {
         result = errno;
     }
+    unlock_data_dir ();
     free (path);
     return result;
 }

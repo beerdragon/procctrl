@@ -1,5 +1,11 @@
 /.deps/
+/config.h
+/config.h.in
 /Makefile
 /Makefile.in
 /*.o
+/*.log
+/*.trs
 /procctrl
+/stamp-h1
+/unittest

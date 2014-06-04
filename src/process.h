@@ -15,7 +15,7 @@
 
 #include <sys/types.h>
 
-void process_housekeep ();
+int process_housekeep ();
 pid_t process_find ();
 int process_save (pid_t process);
 
