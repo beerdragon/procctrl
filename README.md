@@ -50,9 +50,10 @@ Building from source
 To build from source on Linux, or similar, platforms use the following in the
 top-level directory (that is, the one containing this file).
 
-  * autoconf
-  * automake
+  * aclocal
   * autoheader
+  * autoconf
+  * automake --add-missing
   * ./configure
   * make check
 
