@@ -13,8 +13,20 @@
 ///
 /// Header file for the termination functions published by kill.c.
 
+#ifdef _WIN32
+
+#include <Windows.h>
+
+#define _WIN32_OR_POSIX(a,b) a
+
+#else /* ifdef _WIN32 */
+
 #include <sys/types.h>
 
-int kill_process (pid_t process);
+#define _WIN32_OR_POSIX(a,b) b
+
+#endif /* ifdef _WIN32 */
+
+int kill_process (_WIN32_OR_POSIX (HANDLE, pid_t) process);
 
 #endif /* ifndef __inc_operations_h */

@@ -15,24 +15,32 @@
 #include "process.h"
 #include "params.h"
 #include <CUnit/Basic.h>
-#include <wait.h>
+#ifndef _WIN32
+# include <wait.h>
+#endif /* ifndef _WIN32 */
 
 static void init_operation_stop () {
     CU_ASSERT_FATAL (params_v (3, "stop", "src/example-child-script.sh", "foo") == 0);
 }
 
 static void do_operation_stop () {
-    pid_t process;
+    _WIN32_OR_POSIX (HANDLE, pid_t) process;
+#ifndef _WIN32
     int i;
+#endif /* ifndef _WIN32 */
     // Process isn't running
-    CU_ASSERT (operation_stop () == ESRCH);
+    CU_ASSERT (operation_stop () == _WIN32_OR_POSIX (ERROR_NOT_FOUND, ESRCH));
     // Start the process and 'stop' should then work
     CU_ASSERT (operation_start () == 0);
     process = process_find ();
     CU_ASSERT (process != 0);
     CU_ASSERT (operation_stop () == 0);
     // Wait for the process to halt
-    CU_ASSERT (waitpid (process, &i, 0) == process);
+#ifdef _WIN32
+	CU_ASSERT (WaitForSingleObject (process, 5000) == WAIT_OBJECT_0);
+#else /* ifdef _WIN32 */
+	CU_ASSERT (waitpid (process, &i, 0) == process);
+#endif /* ifdef _WIN32 */
     // Process isn't running
     CU_ASSERT (operation_stop () == ESRCH);
 }

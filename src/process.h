@@ -13,10 +13,22 @@
 ///
 /// Header file for exported definitions from process.c used by other components.
 
+#ifdef _WIN32
+
+#include <Windows.h>
+
+#define _WIN32_OR_POSIX(a,b) a
+
+#else /* ifdef _WIN32 */
+
 #include <sys/types.h>
 
+#define _WIN32_OR_POSIX(a,b) b
+
+#endif /* ifdef _WIN32 */
+
 int process_housekeep ();
-pid_t process_find ();
-int process_save (pid_t process);
+_WIN32_OR_POSIX (HANDLE, pid_t) process_find ();
+int process_save (_WIN32_OR_POSIX (HANDLE, pid_t) process);
 
 #endif /* ifndef __inc_process_h */

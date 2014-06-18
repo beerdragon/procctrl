@@ -10,38 +10,18 @@
 
 #include "kill.h"
 #include "params.h"
-#include <ctype.h>
-#include <dirent.h>
-#include <errno.h>
-#include <signal.h>
+#include "parent.h"
+#ifndef _WIN32
+# include <dirent.h>
+# include <ctype.h>
+# include <errno.h>
+# include <signal.h>
+#endif /* ifndef _WIN32 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-/// @brief Gets the parent PID of a process
-///
-/// Queries the process status information and returns the parent ID.
-///
-/// @return the parent PID, or (pid_t)-1 if there is a problem
-static pid_t get_parent (
-    pid_t process ///<the process to query>
-    ) {
-    char tmp[32];
-    FILE *status;
-    pid_t parent = (pid_t)-1;
-    if (snprintf (tmp, sizeof (tmp), "/proc/%u/status", process) < 32) {
-        status = fopen (tmp, "rt");
-        if (status) {
-            while (fgets (tmp, sizeof (tmp), status)) {
-                if (!strncmp (tmp, "PPid:\t", 6)) {
-                    parent = (pid_t)strtol (tmp + 6, NULL, 10);
-                }
-            }
-            fclose (status);
-        }
-    }
-    return parent;
-}
+#ifndef _WIN32
 
 /// @brief Linked list of pid_t values
 struct _pid_t_list {
@@ -100,9 +80,11 @@ static int signal_tree (
     return 0;
 }
 
+#endif /* ifndef _WIN32 */
+
 /// @brief Terminates the process
 ///
-/// Sends the termination signal (SIGTERM) to the process.
+/// The given process, and all of its children, are terminated by the O/S.
 ///
 /// An improvement would be to allow the signal to be specified as a parameter
 /// and wait, for a given period, for the process to terminate before sending
@@ -110,8 +92,14 @@ static int signal_tree (
 ///
 /// @return zero if the process was terminated, a non-zero error code otherwise
 int kill_process (
-    pid_t process ///<the PID of the process to terminate>
+	_WIN32_OR_POSIX (HANDLE, pid_t) process ///<the process to terminate>
     ) {
-    // Stop the processes before child enumeration, terminate them afterwards
+#ifdef _WIN32
+	fprintf (stderr, "TODO: %s (%d)\n", __FUNCTION__, __LINE__);
+	// TODO
+	return ERROR_NOT_SUPPORTED;
+#else /* ifdef _WIN32 */
+    // Stop the processes with SIGTERM
     return signal_tree (process, SIGTERM);
+#endif /* ifdef _WIN32 */
 }

@@ -1,0 +1,75 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>uk.co.beerdragon</groupId>
+  <artifactId>procctrl-win32</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>native-exec</packaging>
+
+  <name>procctrl</name>
+  <description>Win32 build of procctrl</description>
+
+  <licenses>
+    <license>
+      <name>GNU General Public License, Version 3.0</name>
+      <url>http://www.gnu.org/licenses/gpl.txt</url>
+    </license>
+  </licenses>
+
+  <properties>
+    <cunit.version>2.1-3</cunit.version>
+    <maven-native-packing.version>0.2.0</maven-native-packing.version>
+  </properties>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>uk.co.beerdragon</groupId>
+        <artifactId>maven-native-packaging</artifactId>
+        <version>${maven-native-packing.version}</version>
+        <extensions>true</extensions>
+        <configuration>
+          <defaults>windows</defaults>
+        </configuration>
+        <executions>
+          <execution>
+            <id>default-package-exec</id>
+            <configuration>
+              <executables>
+                <executable>
+                  <arch>i386</arch>
+                  <path>target/Release-i386</path>
+                  <headers />
+                  <libraries />
+                </executable>
+                <executable>
+                  <arch>x64</arch>
+                  <path>target/Release-x64</path>
+                  <headers />
+                  <libraries />
+                </executable>
+              </executables>
+              <sources>
+                <source>
+                  <path>.</path>
+                  <pattern>LICENSE</pattern>
+                </source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <dependencies>
+    <dependency>
+      <groupId>net.sourceforge.cunit</groupId>
+      <artifactId>win32</artifactId>
+      <version>${cunit.version}</version>
+      <type>native-static</type>
+    </dependency>
+  </dependencies>
+
+</project>

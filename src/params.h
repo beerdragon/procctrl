@@ -14,7 +14,19 @@
 /// Header file for the global variables corresponding to the program
 /// parameters defined in params.c.
 
+#ifdef _WIN32
+
+#include <Windows.h>
+
+#define _WIN32_OR_POSIX(a,b) a
+
+#else /* ifdef _WIN32 */
+
 #include <sys/types.h>
+
+#define _WIN32_OR_POSIX(a,b) b
+
+#endif /* ifdef _WIN32 */
 
 #ifndef MODULE_VAR_EXTERN
 /// @brief Declares a reference to a value defined by params.c
@@ -41,7 +53,7 @@ MODULE_VAR_EXTERN int MODULE_VAR_CONST global_identifier;
 /// @brief The `k` parameter
 MODULE_VAR_EXTERN char const * MODULE_VAR_CONST process_identifier;
 /// @brief The `P` parameter
-MODULE_VAR_EXTERN pid_t MODULE_VAR_CONST parent_process;
+MODULE_VAR_EXTERN _WIN32_OR_POSIX (HANDLE, pid_t) MODULE_VAR_CONST parent_process;
 /// @brief The `p` parameter
 MODULE_VAR_EXTERN int MODULE_VAR_CONST watch_parent;
 /// @brief The `v` parameter

@@ -38,13 +38,13 @@ void _verbose_test ();
     VERBOSE_SILENT (stderr)
 
 #define VERBOSE_AND_QUIET_TEST(testcase) \
-    static void test_##testcase () { \
+    static void test_##testcase (void) { \
         VERBOSE_WATCH (stdout); \
         init_##testcase (); \
         do_##testcase (); \
         VERBOSE_SILENT (stdout); \
     } \
-    static void test_##testcase##_verbose () { \
+    static void test_##testcase##_verbose (void) { \
         VERBOSE_WATCH (stdout); \
         init_##testcase (); \
         _verbose_test (); \

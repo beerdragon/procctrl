@@ -1,0 +1,93 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{5cf1b735-1987-40be-b811-87f17a3539b1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{bae8ef3e-8a75-4cbc-8f9d-fc60efd55e8e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\kill.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\operations.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\params.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\process.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\watchdog.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\test_units.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\test_verbose.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\getopt.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\parent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\kill.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\params.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\process.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\query.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\start.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\stop.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\watchdog.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_kill.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_params.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_process.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_query.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_start.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_stop.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_units.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test_watchdog.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\getopt.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\parent.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

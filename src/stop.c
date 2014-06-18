@@ -12,8 +12,10 @@
 #include "kill.h"
 #include "params.h"
 #include "process.h"
-#include <errno.h>
-#include <signal.h>
+#ifndef _WIN32
+# include <errno.h>
+# include <signal.h>
+#endif /* ifndef _WIN32 */
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -25,14 +27,18 @@
 ///
 /// @return zero if successful, otherwise a non-zero error code
 int operation_stop () {
-    pid_t process;
+	_WIN32_OR_POSIX (HANDLE, pid_t) process;
     if (verbose) fprintf (stdout, "Stopping spawned process\n");
     process = process_find ();
-    if (process) {
-        if (verbose) fprintf (stdout, "Killing process %u\n", process);
-        return kill_process (process);
+	if (process) {
+        if (verbose) fprintf (stdout, "Killing process %u\n", _WIN32_OR_POSIX (GetProcessId (process), process));
+        int result = kill_process (process);
+#ifdef _WIN32
+		CloseHandle (process);
+#endif /* ifdef _WIN32 */
+		return result;
     } else {
         if (verbose) fprintf (stdout, "No process to stop\n");
-        return ESRCH;
+		return _WIN32_OR_POSIX (ERROR_NOT_FOUND, ESRCH);
     }
 }

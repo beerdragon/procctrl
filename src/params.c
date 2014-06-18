@@ -18,13 +18,19 @@
 #include "params.h"
 #undef MODULE_VAR_EXTERN
 #undef MODULE_VAR_CONST
-#include <ctype.h>
-#include <errno.h>
+#ifdef _WIN32
+# include <strsafe.h>
+# define snprintf StringCchPrintfA
+# include "getopt_win.h"
+#else /* ifdef _WIN32 */
+# include <ctype.h>
+# include <errno.h>
+# include <unistd.h>
+#endif /* ifndef _WIN32 */
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 /// @brief Copies the argument strings
 ///
@@ -70,13 +76,26 @@ static void auto_process_identifier () {
     process_identifier = ptr = (char*)malloc (size);
     if (!process_identifier) abort ();
     for (arg = 0; arg < spawn_argc; arg++) {
+		size_t len;
         if (arg) *(ptr++) = ' ';
-        size_t len = strlen (spawn_argv[arg]);
+        len = strlen (spawn_argv[arg]);
         memcpy (ptr, spawn_argv[arg], len);
         ptr += len;
     }
     *ptr = 0;
 }
+
+#ifdef _WIN32
+/// @brief Opens a handle to the parent process
+///
+/// The parent process is located, if possible, and a handle to it opened. If
+/// the parent cannot be located then the parent handle is set to NULL.
+static void open_parent_process () {
+	fprintf (stderr, "TODO: %s (%d)\n", __FUNCTION__, __LINE__);
+	// TODO
+	parent_process = NULL;
+}
+#endif /* ifdef _WIN32 */
 
 /// @brief Expands the `~` character in the data directory path
 ///
@@ -110,19 +129,21 @@ int params (
     int argc, ///<the number of arguments, as passed to main(int,char**)
     char **argv ///<the argument values, as passed to main(int,char**)
     ) {
-    data_dir = "~/.procctrl";
+	data_dir = "~" _WIN32_OR_POSIX ("\\", "/") ".procctrl";
     global_identifier = 0;
     process_identifier = NULL;
-    parent_process = getppid ();
+    parent_process = _WIN32_OR_POSIX (INVALID_HANDLE_VALUE, getppid ());
     watch_parent = 0;
     verbose = 0;
     housekeep_mode = HOUSEKEEP_FULL;
     if (argc > 1) {
         int arg;
         int optind_save = optind;
+#ifndef _WIN32
         int opterr_save = opterr;
-        optind = 1;
         opterr = 0;
+#endif /* ifndef _WIN32 */
+        optind = 1;
         while ((arg = getopt (argc, argv, "d:H:Kk:P:pv")) != -1) {
             switch (arg) {
                 case 'd' :
@@ -139,8 +160,8 @@ int params (
                     process_identifier = strdup (optarg);
                     if (!process_identifier) abort ();
                     break;
-                case 'P' :
-                    parent_process = atoi (optarg);
+				case 'P' :
+					parent_process = _WIN32_OR_POSIX (OpenProcess (PROCESS_QUERY_INFORMATION, FALSE, atoi (optarg)), atoi (optarg));
                     break;
                 case 'p' :
                     watch_parent = 1;
@@ -170,9 +191,13 @@ int params (
                             }
                             break;
                     }
+#ifdef _WIN32
+					return ERROR_INVALID_PARAMETER;
+#else /* ifdef _WIN32 */
                     optind = optind_save;
                     opterr = opterr_save;
                     return EINVAL;
+#endif /* ifdef _WIN32 */
                 default :
                     abort ();
             }
@@ -181,21 +206,26 @@ int params (
         operation = (arg < argc) ? argv[arg++] : NULL;
         spawn_argc = argc - arg;
         argv += arg;
+#ifndef _WIN32
         optind = optind_save;
         opterr = opterr_save;
+#endif /* ifndef _WIN32 */
     } else {
         operation = NULL;
         spawn_argc = 0;
     }
     spawn_argv = copy_args (spawn_argc, argv);
     if (process_identifier == NULL) auto_process_identifier ();
+#ifdef _WIN32
+	if (parent_process == INVALID_HANDLE_VALUE) open_parent_process ();
+#endif /* ifdef _WIN32 */
     if ((data_dir[0] == '~') && (data_dir[1] == '/')) expand_home_dir ();
     if (verbose) {
         int arg;
         fprintf (stdout, "Data directory     : %s\n", data_dir);
         fprintf (stdout, "Identifier scope   : %s\n", global_identifier ? "Global" : "Local to parent");
         fprintf (stdout, "Process identifier : %s\n", process_identifier ? process_identifier : "");
-        fprintf (stdout, "Parent PID         : %u\n", parent_process);
+        fprintf (stdout, "Parent PID         : %u\n", _WIN32_OR_POSIX (GetProcessId (parent_process), parent_process));
         fprintf (stdout, "Watch parent       : %s\n", watch_parent ? "Yes" : "No");
         fprintf (stdout, "Housekeeping mode  : %d\n", housekeep_mode);
         fprintf (stdout, "Operation          : %s\n", operation);
@@ -240,7 +270,7 @@ int params_v (
     va_end (args);
     // Allocate the block
     argv = (char**)malloc (size);
-    if (!argv) return ENOMEM;
+    if (!argv) return _WIN32_OR_POSIX (ERROR_OUTOFMEMORY, ENOMEM);
     // Copy the strings into the second part of the block and put pointers
     // to there in the first part of the block.
     ptr = (char*)(argv + num + 2);

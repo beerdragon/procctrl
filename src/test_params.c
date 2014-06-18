@@ -14,9 +14,11 @@
 #include "params.h"
 #include "test_verbose.h"
 #include <CUnit/Basic.h>
-#include <unistd.h>
+#ifndef _WIN32
+# include <unistd.h>
+#endif /* ifndef _WIN32 */
 
-static void test_params_d () {
+static void test_params_d (void) {
     VERBOSE_WATCH_ALL;
     // Expect parameter for d
     CU_ASSERT (params_v (1, "-d") == EINVAL);
@@ -31,7 +33,7 @@ static void test_params_d () {
     VERBOSE_SILENT_ALL;
 }
 
-static void test_params_H () {
+static void test_params_H (void) {
     VERBOSE_WATCH_ALL;
     // Expect parameter for H
     CU_ASSERT (params_v (1, "-H") == EINVAL);
@@ -45,7 +47,7 @@ static void test_params_H () {
     VERBOSE_SILENT_ALL;
 }
 
-static void test_params_K () {
+static void test_params_K (void) {
     VERBOSE_WATCH_ALL;
     // Default is local
     CU_ASSERT (params_v (0) == 0);
@@ -56,35 +58,41 @@ static void test_params_K () {
     VERBOSE_SILENT_ALL;
 }
 
-static void test_params_k () {
+static void test_params_k (void) {
     VERBOSE_WATCH_ALL;
     // Expect parameter for k
     CU_ASSERT (params_v (1, "-k") == EINVAL);
     VERBOSE_STDERR_ONLY;
     // Default is command line based
     CU_ASSERT (params_v (3, "query", "foo", "bar") == 0);
+	CU_ASSERT_FATAL (process_identifier != NULL);
     CU_ASSERT (!strcmp (process_identifier, "foo bar"));
     // Explicit value
     CU_ASSERT (params_v (5, "-k", "Test", "query", "foo", "bar") == 0);
+	CU_ASSERT_FATAL (process_identifier != NULL);
     CU_ASSERT (!strcmp (process_identifier, "Test"));
     VERBOSE_SILENT_ALL;
 }
 
-static void test_params_P () {
+static void test_params_P (void) {
     VERBOSE_WATCH_ALL;
     // Expect parameter for P
-    CU_ASSERT (params_v (1, "-P") == EINVAL);
+    CU_ASSERT (params_v (1, "-P") == _WIN32_OR_POSIX (ERROR_INVALID_PARAMETER, EINVAL));
     VERBOSE_STDERR_ONLY;
     // Default is parent ID
     CU_ASSERT (params_v (0) == 0);
+#ifdef _WIN32
+    CU_ASSERT (parent_process != INVALID_HANDLE_VALUE);
+#else /* ifdef _WIN32 */
     CU_ASSERT (parent_process == getppid ());
+#endif /* ifdef _WIN32 */
     // Explicit value
     CU_ASSERT (params_v (2, "-P", "1234") == 0);
-    CU_ASSERT (parent_process == 1234);
+    CU_ASSERT (parent_process == _WIN32_OR_POSIX (INVALID_HANDLE_VALUE, 1234));
     VERBOSE_SILENT_ALL;
 }
 
-static void test_params_p () {
+static void test_params_p (void) {
     VERBOSE_WATCH_ALL;
     // Default is not to watch
     CU_ASSERT (params_v (0) == 0);
@@ -95,7 +103,7 @@ static void test_params_p () {
     VERBOSE_SILENT_ALL;
 }
 
-static void test_params_v () {
+static void test_params_v (void) {
     VERBOSE_WATCH_ALL;
     // Default is not verbose
     CU_ASSERT (params_v (0) == 0);
@@ -107,7 +115,7 @@ static void test_params_v () {
     VERBOSE_STDOUT_ONLY;
 }
 
-static void test_params_inval () {
+static void test_params_inval (void) {
     VERBOSE_WATCH_ALL;
     // Unrecognised option
     CU_ASSERT (params_v (1, "-x") == EINVAL);

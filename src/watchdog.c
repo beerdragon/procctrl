@@ -10,30 +10,50 @@
 
 #include "watchdog.h"
 #include "params.h"
-#include <wait.h>
+#ifdef _WIN32
+# include <Windows.h>
+# define _WIN32_OR_POSIX(a,b) a
+#else /* ifdef _WIN32 */
+# include <wait.h>
+# include <unistd.h>
+# include <sys/stat.h>
+# define _WIN32_OR_POSIX(a,b) b
+#endif /* ifdef _WIN32 */
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <sys/stat.h>
 
-/// @brief Tests if a process is valid
+/// @brief Tests if a process is valid (still running)
 ///
-/// This is used in favour of kill(pid_t,int) because invalid PID values like
-/// 0 and -1 have special meaning to kill and do not get reported as invalid.
+/// On Linux this is used in favour of kill(pid_t,int) because invalid PID
+/// values like 0 and -1 have special meaning to kill and do not get reported
+/// as invalid.
+///
+/// On Windows this checks the status of the process handle.
 ///
 /// @return zero if the process is not running, non-zero if it is
 int _is_running (
-    pid_t process ///<the process identifier to check>
+	_WIN32_OR_POSIX (HANDLE, pid_t) process ///<the process to the check>
     ) {
+#ifdef _WIN32
+	return WaitForSingleObject (process, 0) == WAIT_TIMEOUT;
+#else /* ifdef _WIN32 */
     char tmp[32];
     if ((kill (process, 0) == 0) && (snprintf (tmp, sizeof (tmp), "/proc/%u/cwd", process) < 32)) {
         struct stat info;
         if (stat (tmp, &info) == 0) {
-            return S_ISDIR (info.st_mode);
+            if (S_ISDIR (info.st_mode)) {
+				// The process exists in the table, but might be a child that has
+				// terminated and not yet signalled us.
+				int status;
+				pid_t terminated;
+				terminated = waitpid (process, &status, WNOHANG);
+				return terminated != process;
+			}
         }
     }
     return 0;
+#endif /* ifdef _WIN32 */
 }
 
 /// @brief Implementation of watchdog(int,...)
@@ -43,31 +63,24 @@ int _is_running (
 ///
 /// @return the index of the terminated process, or -1 if all are valid
 int _watchdog0_v (
-    int count, ///<the number of pid_t parameters in pids>
-    va_list pids ///<the pid_t values to monitor>
+    int count, ///<the number of pid_t/HANDLE parameters in pids>
+    va_list processes ///<the pid_t/HANDLE values to monitor>
     ) {
     int i;
     for (i = 0; i < count; i++) {
-        pid_t process = va_arg (pids, pid_t);
-        if (_is_running (process)) {
-            // The process exists in the table, but might be a child that has
-            // terminated and not yet signalled us.
-            int status;
-            pid_t terminated;
-            terminated = waitpid (process, &status, WNOHANG);
-            if (terminated != process) continue;
-        }
-        if (verbose) fprintf (stdout, "Process %u is no longer valid\n", process);
+		_WIN32_OR_POSIX (HANDLE, pid_t) process = va_arg (processes, _WIN32_OR_POSIX (HANDLE, pid_t));
+        if (_is_running (process)) continue;
+        if (verbose) fprintf (stdout, "Process %u is no longer valid\n", _WIN32_OR_POSIX (GetProcessId (process), process));
         return i;
     }
     return -1;
 }
 
-/// @brief Watches one or more PIDs for termination
+/// @brief Watches one or more processes for termination
 ///
-/// The supplied PIDs are monitored for any that have terminated. These may be
-/// child PIDs spawned by this process, or other arbitrary PIDs corresponding
-/// to logical parent processes.
+/// The supplied PID/HANDLEs are monitored for any that have terminated. These
+/// may be children spawned by this process, or other arbitrary processes
+/// corresponding to logical parents.
 ///
 /// Note that a process which cannot be queried, perhaps because of security
 /// reasons, will be reported as terminated.
@@ -75,25 +88,25 @@ int _watchdog0_v (
 /// If the terminated proces was a spawned child then the signal from that
 /// child will be consumed (see POSIX `waitpid`).
 ///
-/// @return the index of the process whose PID is no longer valid.
+/// @return the index of the process which is no longer valid.
 int watchdog (
-    int count, ///<the number of pid_t parameters to follow>
-    ... ///<the pid_t values to monitor>
+    int count, ///<the number of pid_t/HANDLE parameters to follow>
+    ... ///<the pid_t/HANDLE values to monitor>
     ) {
     int i;
-    va_list pids;
+    va_list processes;
     if (verbose) {
-        va_start (pids, count);
+        va_start (processes, count);
         for (i = 0; i < count; i++) {
-            fprintf (stdout, "Watching process %u for termination\n", va_arg (pids, pid_t));
+            fprintf (stdout, "Watching process %u for termination\n", _WIN32_OR_POSIX (GetProcessId (va_arg (processes, HANDLE)), va_arg (processes, pid_t)));
         }
-        va_end (pids);
+        va_end (processes);
     }
     do {
-        va_start (pids, count);
-        i = _watchdog0_v (count, pids);
-        va_end (pids);
+        va_start (processes, count);
+        i = _watchdog0_v (count, processes);
+        va_end (processes);
         if (i >= 0) return i;
-        sleep (1);
+		_WIN32_OR_POSIX (Sleep, sleep) (1);
     } while (1);
 }
