@@ -4,7 +4,7 @@
 
   <groupId>uk.co.beerdragon</groupId>
   <artifactId>procctrl-win32</artifactId>
-  <version>0.1.0-SNAPSHOT</version>
+  <version>0.1.0</version>
   <packaging>native-exec</packaging>
 
   <name>procctrl</name>
