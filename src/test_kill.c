@@ -22,22 +22,35 @@
 
 static _WIN32_OR_POSIX (HANDLE, pid_t) _child = 0;
 
+int _fork_init_kill_process () {
+    _WIN32_OR_POSIX (Sleep (30000), sleep (30));
+    fprintf (stderr, "Child process %u from %s was NOT killed\n", _WIN32_OR_POSIX (GetCurrentProcessId (), getpid ()), __FUNCTION__);
+    return 0;
+}
+
 static void init_kill_process () {
+#ifdef _WIN32
+	TCHAR szExecutable[MAX_PATH];
+	TCHAR szParams[] = TEXT ("test.exe fork init_kill_process");
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+#endif /* ifdef _WIN32 */
     CU_ASSERT (_child == 0);
     params_v (0);
     // Start a child process
 #ifdef _WIN32
-	fprintf (stderr, "TODO: %s (%d)\n", __FUNCTION__, __LINE__);
-	// TODO
-	_child = INVALID_HANDLE_VALUE;
+	ZeroMemory (&si, sizeof (si));
+	si.cb = sizeof (si);
+	if (GetModuleFileName (NULL, szExecutable, sizeof (szExecutable) / sizeof (TCHAR))
+	 && CreateProcess (szExecutable, szParams, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+		_child = pi.hProcess;
+		CloseHandle (pi.hThread);
+	} else {
+		_child = INVALID_HANDLE_VALUE;
+	}
 #else /* ifdef _WIN32 */
     _child = fork ();
-	if (!_child) {
-        // This is the child process; wait to be killed
-        sleep (30);
-        fprintf (stderr, "Child process %u from %s was NOT killed\n", getpid (), __func__);
-        exit (0);
-	}
+	if (!_child) _fork_init_kill_process ();
 #endif /* ifdef _WIN32 */
     CU_ASSERT (_child != _WIN32_OR_POSIX (INVALID_HANDLE_VALUE, (pid_t)-1));
 }

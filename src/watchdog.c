@@ -36,6 +36,7 @@ int _is_running (
 	_WIN32_OR_POSIX (HANDLE, pid_t) process ///<the process to the check>
     ) {
 #ifdef _WIN32
+	if ((process == NULL) || (process == INVALID_HANDLE_VALUE)) return 0;
 	return WaitForSingleObject (process, 0) == WAIT_TIMEOUT;
 #else /* ifdef _WIN32 */
     char tmp[32];
@@ -107,6 +108,6 @@ int watchdog (
         i = _watchdog0_v (count, processes);
         va_end (processes);
         if (i >= 0) return i;
-		_WIN32_OR_POSIX (Sleep, sleep) (1);
+		_WIN32_OR_POSIX (Sleep (1000), sleep (1));
     } while (1);
 }

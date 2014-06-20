@@ -39,13 +39,15 @@
               <executables>
                 <executable>
                   <arch>i386</arch>
-                  <path>target/Release-i386</path>
+                  <path>target/Release-Win32</path>
+                  <pattern>procctrl.exe</pattern>
                   <headers />
                   <libraries />
                 </executable>
                 <executable>
                   <arch>x64</arch>
                   <path>target/Release-x64</path>
+                  <pattern>procctrl.exe</pattern>
                   <headers />
                   <libraries />
                 </executable>

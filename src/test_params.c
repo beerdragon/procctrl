@@ -21,22 +21,27 @@
 static void test_params_d (void) {
     VERBOSE_WATCH_ALL;
     // Expect parameter for d
-    CU_ASSERT (params_v (1, "-d") == EINVAL);
+    CU_ASSERT (params_v (1, "-d") == _WIN32_OR_POSIX (ERROR_INVALID_PARAMETER, EINVAL));
     VERBOSE_STDERR_ONLY;
     // Default is ~/.procctrl (expanded)
     CU_ASSERT (params_v (0) == 0);
+#ifdef _WIN32
+    CU_ASSERT (data_dir[1] == ':');
+    CU_ASSERT (data_dir[2] == '\\');
+#else /* ifdef _WIN32 */
     CU_ASSERT (data_dir[0] == '/');
-    CU_ASSERT (!strcmp (data_dir + strlen (data_dir) - 10, "/.procctrl"));
+#endif /* ifdef _WIN32 */
+    CU_ASSERT (!strcmp (data_dir + strlen (data_dir) - 10, _WIN32_OR_POSIX ("\\", "/") ".procctrl"));
     // Explicit value
-    CU_ASSERT (params_v (2, "-d", "/foo/bar/path") == 0);
-    CU_ASSERT (!strcmp (data_dir, "/foo/bar/path"));
+    CU_ASSERT (params_v (2, "-d", _WIN32_OR_POSIX ("C:\\foo\\bar\\path", "/foo/bar/path")) == 0);
+    CU_ASSERT (!strcmp (data_dir, _WIN32_OR_POSIX ("C:\\foo\\bar\\path", "/foo/bar/path")));
     VERBOSE_SILENT_ALL;
 }
 
 static void test_params_H (void) {
     VERBOSE_WATCH_ALL;
     // Expect parameter for H
-    CU_ASSERT (params_v (1, "-H") == EINVAL);
+    CU_ASSERT (params_v (1, "-H") == _WIN32_OR_POSIX (ERROR_INVALID_PARAMETER, EINVAL));
     VERBOSE_STDERR_ONLY;
     // Default is ALL
     CU_ASSERT (params_v (0) == 0);
@@ -61,7 +66,7 @@ static void test_params_K (void) {
 static void test_params_k (void) {
     VERBOSE_WATCH_ALL;
     // Expect parameter for k
-    CU_ASSERT (params_v (1, "-k") == EINVAL);
+    CU_ASSERT (params_v (1, "-k") == _WIN32_OR_POSIX (ERROR_INVALID_PARAMETER, EINVAL));
     VERBOSE_STDERR_ONLY;
     // Default is command line based
     CU_ASSERT (params_v (3, "query", "foo", "bar") == 0);
@@ -88,7 +93,11 @@ static void test_params_P (void) {
 #endif /* ifdef _WIN32 */
     // Explicit value
     CU_ASSERT (params_v (2, "-P", "1234") == 0);
-    CU_ASSERT (parent_process == _WIN32_OR_POSIX (INVALID_HANDLE_VALUE, 1234));
+#ifdef _WIN32
+	CU_ASSERT ((parent_process == NULL) || (GetProcessId (parent_process) == 1234));
+#else /* ifdef _WIN32 */
+    CU_ASSERT (parent_process == 1234);
+#endif /* ifdef _WIN32 */
     VERBOSE_SILENT_ALL;
 }
 
@@ -118,9 +127,9 @@ static void test_params_v (void) {
 static void test_params_inval (void) {
     VERBOSE_WATCH_ALL;
     // Unrecognised option
-    CU_ASSERT (params_v (1, "-x") == EINVAL);
+    CU_ASSERT (params_v (1, "-x") == _WIN32_OR_POSIX (ERROR_INVALID_PARAMETER, EINVAL));
     VERBOSE_STDERR_ONLY;
-    CU_ASSERT (params_v (1, "-\n") == EINVAL);
+    CU_ASSERT (params_v (1, "-\n") == _WIN32_OR_POSIX (ERROR_INVALID_PARAMETER, EINVAL));
     VERBOSE_STDERR_ONLY;
 }
 

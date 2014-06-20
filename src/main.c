@@ -15,6 +15,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef _WIN32
+int _fork_watchdog (DWORD dwChild, DWORD dwParent); // start.c
+#endif /* ifdef _WIN32 */
+
 /// @brief Program entry point
 ///
 /// Proceses the parameters from the command line and dispatches the requested
@@ -32,6 +36,16 @@ int main (
     char **argv ///<the command line arguments>
     ) {
     int e;
+#ifdef _WIN32
+	if ((argc > 2) && !strcmp (argv[1], "fork")) {
+		if (!strcmp (argv[2], "watchdog")) {
+			return _fork_watchdog (atoi (argv[3]), atoi (argv[4]));
+		} else {
+			fprintf (stderr, "Bad fork %s\n", argv[2]);
+			return ERROR_INVALID_PARAMETER;
+		}
+	}
+#endif /* ifdef _WIN32 */
     if ((e = params (argc, argv)) == 0) {
         if (housekeep_mode & HOUSEKEEP_BEFORE) process_housekeep ();
         if ((operation == NULL) || !strcmp (operation, "query")) {

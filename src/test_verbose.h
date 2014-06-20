@@ -10,11 +10,17 @@
 
 void _verbose_test ();
 
-#define VERBOSE_WATCH(stream) long stream##c = ftell (stream)
+#ifdef _WIN32
 
-#define VERBOSE_WATCH_ALL \
-    VERBOSE_WATCH (stdout); \
-    VERBOSE_WATCH (stderr)
+// TODO: Need an alternative for ftell that will work on Win32
+
+#define VERBOSE_WATCH(stream)
+#define VERBOSE_EXPECT(stream)
+#define VERBOSE_SILENT(stream)
+
+#else /* ifdef _WIN32 */
+
+#define VERBOSE_WATCH(stream) long stream##c = ftell (stream)
 
 #define VERBOSE_EXPECT(stream) \
     { \
@@ -24,6 +30,12 @@ void _verbose_test ();
     }
 
 #define VERBOSE_SILENT(stream) CU_ASSERT (stream##c == ftell (stream))
+
+#endif /* ifdef _WIN32 */
+
+#define VERBOSE_WATCH_ALL \
+    VERBOSE_WATCH (stdout); \
+    VERBOSE_WATCH (stderr)
 
 #define VERBOSE_STDERR_ONLY \
     VERBOSE_EXPECT (stderr); \

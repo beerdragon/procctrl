@@ -18,8 +18,27 @@
 #include <stdio.h>
 
 int getopt (int argc, char **argv, const char *args) {
-	fprintf (stderr, "TODO: %s (%d)\n", __FUNCTION__, __LINE__);
-	// TODO
-	optopt = '?';
-	return '?';
+	if (optind < argc) {
+		if ((argv[optind][0] == '/') || (argv[optind][0] == '-')) {
+			const char *arg = args;
+			optopt = argv[optind++][1];
+			while (*arg) {
+				if (optopt == *arg) {
+					if (arg[1] == ':') {
+						if (argv[optind - 1][2]) {
+							optarg = argv[optind - 1] + 2;
+						} else if (optind < argc) {
+							optarg = argv[optind++];
+						} else {
+							return '?';
+						}
+					}
+					return optopt;
+				}
+				arg++;
+			}
+			return '?';
+		}
+	}
+	return -1;
 }

@@ -37,21 +37,34 @@ static int _watchdog0 (int count, ...) {
     return i;
 }
 
-void test_watchdog_fork0 () {
-    _WIN32_OR_POSIX (Sleep, sleep) (30);
-    fprintf (stderr, "Child process %u from %s was NOT killed\n", _WIN32_OR_POSIX (GetCurrentProcessId (), getpid ()), __FILE__);
-    exit (0);
+int _fork_spawn_child () {
+    _WIN32_OR_POSIX (Sleep (30000), sleep (30));
+    fprintf (stderr, "Child process %u from %s was NOT killed\n", _WIN32_OR_POSIX (GetCurrentProcessId (), getpid ()), __FUNCTION__);
+    return 0;
 }
 
 static void spawn_child () {
-    CU_ASSERT_FATAL (_child == 0);
 #ifdef _WIN32
-	fprintf (stderr, "TODO: %s (%d)\n", __FUNCTION__, __LINE__);
-	// TODO: fork "test_watchdog_fork0"
-	_child = INVALID_HANDLE_VALUE;
+	TCHAR szExecutable[MAX_PATH];
+	TCHAR szParams[] = TEXT ("test.exe fork spawn_child");
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+#endif /* ifdef _WIN32 */
+    CU_ASSERT_FATAL (_child == 0);
+    // Start a child process
+#ifdef _WIN32
+	ZeroMemory (&si, sizeof (si));
+	si.cb = sizeof (si);
+	if (GetModuleFileName (NULL, szExecutable, sizeof (szExecutable) / sizeof (TCHAR))
+	 && CreateProcess (szExecutable, szParams, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+		_child = pi.hProcess;
+		CloseHandle (pi.hThread);
+	} else {
+		_child = INVALID_HANDLE_VALUE;
+	}
 #else /* ifdef _WIN32 */
     _child = fork ();
-	if (!_child) test_watchdog_fork0 ();
+	if (!_child) exit (_fork_spawn_child ());
 #endif /* ifdef _WIN32 */
     CU_ASSERT (_child != _WIN32_OR_POSIX (INVALID_HANDLE_VALUE, (pid_t)-1));
 }
@@ -101,17 +114,18 @@ static void do_watchdog_child () {
     CU_ASSERT (_watchdog0 (2, _WIN32_OR_POSIX (hParent, getppid ()), _child) == -1);
     // Kill the child process that was started
 #ifdef _WIN32
-	fprintf (stderr, "TODO: %s (%d)\n", __FUNCTION__, __LINE__);
-	// TODO: Terminate the child process
+	TerminateProcess (_child, ERROR_ALERTED);
 #else /* ifdef _WIN32 */
     kill (_child, SIGTERM);
 #endif /* ifdef _WIN32 */
     // The blocking watchdog call will now complete, indicating the child
     CU_ASSERT (watchdog (2, _WIN32_OR_POSIX (hParent, getppid ()), _child) == 1);
-#ifndef _WIN32
+#ifdef _WIN32
+	CloseHandle (_child);
+#else /* ifdef _WIN32 */
     // The watchdog *may* have consumed the child signal
     waitpid (_child, &status, WNOHANG);
-#endif /* ifndef _WIN32 */
+#endif /* ifdef _WIN32 */
     _child = 0;
 }
 

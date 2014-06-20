@@ -20,7 +20,7 @@
 #endif /* ifndef _WIN32 */
 
 static void init_operation_stop () {
-    CU_ASSERT_FATAL (params_v (3, "stop", "src/example-child-script.sh", "foo") == 0);
+    CU_ASSERT_FATAL (params_v (3, "stop", _WIN32_OR_POSIX ("src\\example-child-script.bat", "src/example-child-script.sh"), "foo") == 0);
 }
 
 static void do_operation_stop () {
@@ -42,7 +42,7 @@ static void do_operation_stop () {
 	CU_ASSERT (waitpid (process, &i, 0) == process);
 #endif /* ifdef _WIN32 */
     // Process isn't running
-    CU_ASSERT (operation_stop () == ESRCH);
+    CU_ASSERT (operation_stop () == _WIN32_OR_POSIX (ERROR_NOT_FOUND, ESRCH));
 }
 
 VERBOSE_AND_QUIET_TEST (operation_stop)

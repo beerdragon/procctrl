@@ -18,6 +18,7 @@
 #include "params.h"
 #undef MODULE_VAR_EXTERN
 #undef MODULE_VAR_CONST
+#include "parent.h"
 #ifdef _WIN32
 # include <strsafe.h>
 # define snprintf StringCchPrintfA
@@ -54,6 +55,12 @@ static char **copy_args (
     for (i = 0; i < argc; i++) {
         char *arg = argv[i];
         size_t len = strlen (arg);
+#ifdef _WIN32
+		if ((*arg == '\"') && (arg[len - 1] == '\"')) {
+			arg++;
+			len--;
+		}
+#endif /* ifdef _WIN32 */
         memcpy (ptr, arg, len + 1);
         result[i] = ptr;
         ptr += len + 1;
@@ -91,17 +98,16 @@ static void auto_process_identifier () {
 /// The parent process is located, if possible, and a handle to it opened. If
 /// the parent cannot be located then the parent handle is set to NULL.
 static void open_parent_process () {
-	fprintf (stderr, "TODO: %s (%d)\n", __FUNCTION__, __LINE__);
-	// TODO
-	parent_process = NULL;
+	parent_process = get_parent (GetCurrentProcess ());
 }
 #endif /* ifdef _WIN32 */
 
 /// @brief Expands the `~` character in the data directory path
 ///
-/// The `~` is replaced by the content of the `HOME` environment variable.
+/// The `~` is replaced by the content of the `HOME` environment variable on
+/// Linux and `USERPROFILE` on Windows.
 static void expand_home_dir () {
-    const char *home = getenv ("HOME");
+    const char *home = getenv (_WIN32_OR_POSIX ("USERPROFILE", "HOME"));
     char *path;
     size_t size;
     if (!home) home = ".";
@@ -172,32 +178,30 @@ int params (
                 case '?' :
                     switch (optopt) {
                         case 'd' :
-                            fprintf (stderr, "-d requires a directory\n");
+                            fprintf (stderr, _WIN32_OR_POSIX ("/", "-") "d requires a directory\n");
                             break;
                         case 'H' :
-                            fprintf (stderr, "-H requires a mode flag\n");
+                            fprintf (stderr, _WIN32_OR_POSIX ("/", "-") "H requires a mode flag\n");
                             break;
                         case 'k' :
-                            fprintf (stderr, "-k requires a process identifier key\n");
+                            fprintf (stderr, _WIN32_OR_POSIX ("/", "-") "k requires a process identifier key\n");
                             break;
                         case 'P' :
-                            fprintf (stderr, "-P requires a process ID\n");
+                            fprintf (stderr, _WIN32_OR_POSIX ("/", "-") "P requires a process ID\n");
                             break;
                         default :
                             if (isprint (optopt)) {
-                                fprintf (stderr, "Unknown option '%c'\n", optopt);
+                                fprintf (stderr, "Unknown option " _WIN32_OR_POSIX ("/", "-") "%c\n", optopt);
                             } else {
-                                fprintf (stderr, "Unknown option 0x%02X\n", optopt & 0xFF);
+                                fprintf (stderr, "Unknown option " _WIN32_OR_POSIX ("/", "-") "0x%02X\n", optopt & 0xFF);
                             }
                             break;
                     }
-#ifdef _WIN32
-					return ERROR_INVALID_PARAMETER;
-#else /* ifdef _WIN32 */
                     optind = optind_save;
+#ifndef _WIN32 /* ifndef _WIN32 */
                     opterr = opterr_save;
-                    return EINVAL;
-#endif /* ifdef _WIN32 */
+#endif /* ifndef _WIN32 */
+                    return _WIN32_OR_POSIX (ERROR_INVALID_PARAMETER, EINVAL);
                 default :
                     abort ();
             }
@@ -219,7 +223,7 @@ int params (
 #ifdef _WIN32
 	if (parent_process == INVALID_HANDLE_VALUE) open_parent_process ();
 #endif /* ifdef _WIN32 */
-    if ((data_dir[0] == '~') && (data_dir[1] == '/')) expand_home_dir ();
+    if ((data_dir[0] == '~') && (data_dir[1] == _WIN32_OR_POSIX ('\\', '/'))) expand_home_dir ();
     if (verbose) {
         int arg;
         fprintf (stdout, "Data directory     : %s\n", data_dir);

@@ -31,11 +31,23 @@ static _WIN32_OR_POSIX (HANDLE, pid_t) _child = 0;
 int _wait_for_execvp (pid_t child);
 #endif /* ifndef __WIN32 */
 
+#define _SEP _WIN32_OR_POSIX ("\\", "/")
+
 static void spawn_example_child_script () {
 #ifdef _WIN32
-	fprintf (stderr, "TODO: %s (%d)\n", __FUNCTION__, __LINE__);
-	// TODO: Spawn the script
-	_child = INVALID_HANDLE_VALUE;
+	TCHAR szArgs[] = TEXT ("cmd.exe /c src\\example-child-script.bat");
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+	ZeroMemory (&si, sizeof (si));
+	si.cb = sizeof (si);
+	CU_ASSERT_FATAL (getenv (TEXT ("ComSpec")) != NULL);
+	if (CreateProcess (getenv (TEXT ("ComSpec")), szArgs, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+		_child = pi.hProcess;
+		CloseHandle (pi.hThread);
+	} else {
+		fprintf (stderr, "Couldn't spawn script %d\n", GetLastError ());
+		_child = INVALID_HANDLE_VALUE;
+	}
 #else /* ifdef _WIN32 */
     _child = fork ();
 	if (!_child) {
@@ -138,25 +150,29 @@ static void init_process_housekeep () {
     CU_ASSERT_FATAL (_child == 0);
     CU_ASSERT_FATAL (params_v (2, "-d", tmpdir) == 0);
     // Create GLOBAL, invalid PPID and valid PPID parent directories
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/GLOBAL", tmpdir) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "GLOBAL", tmpdir) < HK_PATH);
 	create_folder (path);
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/0", tmpdir) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "0", tmpdir) < HK_PATH);
 	create_folder (path);
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/%d", tmpdir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "%d", tmpdir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
 	create_folder (path);
     // Create invalid info files in GLOBAL
     for (i = 1; i <= 4; i++) {
-        CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/GLOBAL/invalid%d", tmpdir, i) < HK_PATH);
+#ifdef _WIN32
+		// verify_pid is not fully implement for Windows so skip check 3
+		if (i == 3) continue;
+#endif /* ifdef _WIN32 */
+        CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "GLOBAL" _SEP "invalid%d", tmpdir, i) < HK_PATH);
         write_info_file (path, -i);
     }
     // Create a valid info file in GLOBAL
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/GLOBAL/valid", tmpdir) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "GLOBAL" _SEP "valid", tmpdir) < HK_PATH);
     write_info_file (path, 1);
     // Create a valid info file in invalid PPID
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/0/test", tmpdir) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "0" _SEP "test", tmpdir) < HK_PATH);
     write_info_file (path, 2);
     // Create a valid info file in valid PPID
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/%d/test", tmpdir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "%d" _SEP "test", tmpdir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
     write_info_file (path, 1);
 #ifdef _WIN32
 	CloseHandle (hParent);
@@ -174,26 +190,27 @@ static void do_process_housekeep () {
     // Run the housekeep
     CU_ASSERT (process_housekeep () == 0);
     // Invalid PPID directory should be deleted
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/0", data_dir) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "0", data_dir) < HK_PATH);
     CU_ASSERT (dir_exists (path) == 0);
     // Other folders remain
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/GLOBAL", data_dir) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "GLOBAL", data_dir) < HK_PATH);
     CU_ASSERT (dir_exists (path) != 0);
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/%d", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "%d", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
     CU_ASSERT (dir_exists (path) != 0);
     // Invalid info files should be deleted
     for (i = 1; i <= 4; i++) {
-        CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/GLOBAL/invalid%d", data_dir, i) < HK_PATH);
+        CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "GLOBAL" _SEP "invalid%d", data_dir, i) < HK_PATH);
         CU_ASSERT (file_exists (path) == 0);
     }
     // Other files should be untouched
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/GLOBAL/valid", data_dir) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "GLOBAL" _SEP "valid", data_dir) < HK_PATH);
     CU_ASSERT (file_exists (path) != 0);
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/%d/test", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "%d" _SEP "test", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
     CU_ASSERT (file_exists (path) != 0);
     // Terminate the child process
     kill_process (_child);
 #ifdef _WIN32
+	printf ("Terminating child process %u\n", GetProcessId (_child));
 	CU_ASSERT (WaitForSingleObject (_child, 5000) == WAIT_OBJECT_0);
 	CloseHandle (_child);
 #else /* ifdef _WIN32 */
@@ -204,14 +221,14 @@ static void do_process_housekeep () {
     CU_ASSERT (process_housekeep () == 0);
     // GLOBAL and PPID directories should now be deleted, but HK folder remains
     CU_ASSERT (dir_exists (data_dir) != 0);
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/GLOBAL", data_dir) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "GLOBAL", data_dir) < HK_PATH);
     CU_ASSERT (dir_exists (path) == 0);
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/%d", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "%d", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
     CU_ASSERT (dir_exists (path) == 0);
     // Delete the housekeep folder
     _WIN32_OR_POSIX (RemoveDirectory, rmdir) (data_dir);
     // Run the housekeep
-    CU_ASSERT (process_housekeep () == ENOENT);
+    CU_ASSERT (process_housekeep () == _WIN32_OR_POSIX (ERROR_PATH_NOT_FOUND, ENOENT));
 #ifdef _WIN32
 	CloseHandle (hParent);
 #endif /* ifdef _WIN32 */
@@ -234,9 +251,9 @@ static void init_process_find () {
 #endif /* ifdef _WIN32 */
     CU_ASSERT (_child == 0);
     CU_ASSERT_FATAL (params_v (4, "-d", tmpdir, "-k", "/Te^st\\") == 0);
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/%d", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "%d", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
 	create_folder (path);
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/%d/^%02XTe^%02Xst^%02X", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ()), (int)'/' & 0xFF, (int)'^' & 0xFF, (int)'\\' & 0xFF) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "%d" _SEP "^%02XTe^%02Xst^%02X", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ()), (int)'/' & 0xFF, (int)'^' & 0xFF, (int)'\\' & 0xFF) < HK_PATH);
     write_info_file (path, 1);
 #ifdef _WIN32
 	CloseHandle (hParent);
@@ -244,12 +261,21 @@ static void init_process_find () {
 }
 
 static void do_process_find () {
-#ifndef _WIN32
+#ifdef _WIN32
+	HANDLE hChild;
+#else /* ifdef _WIN32 */
     int status;
-#endif /* ifndef _WIN32 */
+#endif /* ifdef _WIN32 */
     CU_ASSERT_FATAL (_child != 0);
     // Should find the child
+#ifdef _WIN32
+	hChild = process_find ();
+	CU_ASSERT (hChild != NULL);
+	CU_ASSERT (GetProcessId (hChild) == GetProcessId (_child));
+	CloseHandle (hChild);
+#else /* ifdef _WIN32 */
     CU_ASSERT (process_find () == _child);
+#endif /* ifdef _WIN32 */
     // Terminate the child
     kill_process (_child);
 #ifdef _WIN32
@@ -288,10 +314,10 @@ static void do_process_save () {
 	HANDLE hParent = get_parent (GetCurrentProcess ());
 #endif /* ifdef _WIN32 */
     CU_ASSERT (process_save (_WIN32_OR_POSIX (INVALID_HANDLE_VALUE, 1234)) == 0);
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/%d/test", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "%d" _SEP "test", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
     CU_ASSERT (file_exists (path) != 0);
     _WIN32_OR_POSIX (DeleteFile, unlink) (path);
-    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s/%d", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
+    CU_ASSERT_FATAL (snprintf (path, HK_PATH, "%s" _SEP "%d", data_dir, _WIN32_OR_POSIX (GetProcessId (hParent), getppid ())) < HK_PATH);
     _WIN32_OR_POSIX (RemoveDirectory, rmdir) (path);
     _WIN32_OR_POSIX (RemoveDirectory, rmdir) (data_dir);
 #ifdef _WIN32

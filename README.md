@@ -59,3 +59,10 @@ top-level directory (that is, the one containing this file).
 
 To install the *procctrl* utility, use `make install` instead of `make check`.
 This must typically be run as `root` to write to the system folders.
+
+To build from source on Windows, there is a Visual Studio solution file. This
+has been tested with Visual Studio Express 2013 and contains configurations
+for both 32- and 64- bit architectures. A POM.XML file is provided which will
+work with `beerdragon/maven-native-packaging` to manage dependencies and
+publish a binary to the Maven repository for any other projects using Maven
+for dependency management that require access to this component.

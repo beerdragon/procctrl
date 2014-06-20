@@ -11,17 +11,82 @@
 #include "kill.h"
 #include "params.h"
 #include "parent.h"
-#ifndef _WIN32
+#ifdef _WIN32
+# include <TlHelp32.h>
+#else /* ifdef _WIN32 */
 # include <dirent.h>
 # include <ctype.h>
 # include <errno.h>
 # include <signal.h>
-#endif /* ifndef _WIN32 */
+#endif /* ifdef _WIN32 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef _WIN32
+#ifdef _WIN32
+
+/// @brief Terminates all processes in a tree
+///
+/// Each process is terminated followed by any child processes that it has
+/// spawned.
+///
+/// @return zero if the process was terminated, a non-zero error code otherwise
+static int terminate_process (
+	HANDLE hProcess ///<the process to terminate>
+	) {
+	FILETIME ftCreateParent;
+	FILETIME ftExit;
+	FILETIME ftKernel;
+	FILETIME ftUser;
+	DWORD dwProcess = GetProcessId (hProcess);
+	HANDLE hSnapshot;
+	PROCESSENTRY32 pe;
+	if (verbose) fprintf (stdout, "Terminating %u\n", dwProcess);
+	// Terminate the process
+	if (!TerminateProcess (hProcess, ERROR_ALERTED)) {
+		return GetLastError ();
+	}
+	if (WaitForSingleObject (hProcess, 5000) != WAIT_OBJECT_0) {
+		fprintf (stderr, "Process %u not terminated\n", dwProcess);
+	}
+	if (!GetProcessTimes (hProcess, &ftCreateParent, &ftExit, &ftKernel, &ftUser)) {
+		fprintf (stderr, "Can't query process %u creation time\n", dwProcess);
+		return GetLastError ();
+	}
+	// Find any children
+	hSnapshot = CreateToolhelp32Snapshot (TH32CS_SNAPPROCESS, 0);
+	if (hSnapshot == INVALID_HANDLE_VALUE) {
+		return GetLastError ();
+	}
+	if (Process32First (hSnapshot, &pe)) {
+		do {
+			if (pe.th32ParentProcessID == dwProcess) {
+				HANDLE hChild = OpenProcess (PROCESS_QUERY_INFORMATION | PROCESS_TERMINATE | SYNCHRONIZE, FALSE, pe.th32ProcessID);
+				if (hChild != NULL) {
+					FILETIME ftCreateChild;
+					if (GetProcessTimes (hChild, &ftCreateChild, &ftExit, &ftKernel, &ftUser)) {
+						// Only terminate if the child was created AFTER the parent to avoid accidentally killing
+						// things when the PIDs have been re-used.
+						if (CompareFileTime (&ftCreateParent, &ftCreateChild) <= 0) {
+							terminate_process (hChild);
+						} else {
+							if (verbose) fprintf (stdout, "Ignoring %u (older than parent)\n", pe.th32ProcessID);
+						}
+					} else {
+						if (verbose) fprintf (stdout, "Ignoring %u (can't get process times)\n", pe.th32ProcessID);
+					}
+					CloseHandle (hChild);
+				} else {
+					if (verbose) fprintf (stdout, "Ignoring %u (can't open)\n", pe.th32ProcessID);
+				}
+			}
+		} while (Process32Next (hSnapshot, &pe));
+	}
+	CloseHandle (hSnapshot);
+	return 0;
+}
+
+#else /* ifdef _WIN32 */
 
 /// @brief Linked list of pid_t values
 struct _pid_t_list {
@@ -80,7 +145,7 @@ static int signal_tree (
     return 0;
 }
 
-#endif /* ifndef _WIN32 */
+#endif /* ifdef _WIN32 */
 
 /// @brief Terminates the process
 ///
@@ -95,9 +160,8 @@ int kill_process (
 	_WIN32_OR_POSIX (HANDLE, pid_t) process ///<the process to terminate>
     ) {
 #ifdef _WIN32
-	fprintf (stderr, "TODO: %s (%d)\n", __FUNCTION__, __LINE__);
-	// TODO
-	return ERROR_NOT_SUPPORTED;
+	// Terminate the process tree
+	return terminate_process (process);
 #else /* ifdef _WIN32 */
     // Stop the processes with SIGTERM
     return signal_tree (process, SIGTERM);

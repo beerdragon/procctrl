@@ -24,19 +24,34 @@
 
 static _WIN32_OR_POSIX (HANDLE, pid_t) _child = 0;
 
+int _fork_init_operation_query () {
+    _WIN32_OR_POSIX (Sleep (30000), sleep (30));
+    fprintf (stderr, "Child process %u from %s was NOT killed\n", _WIN32_OR_POSIX (GetCurrentProcessId (), getpid ()), __FUNCTION__);
+    return 0;
+}
+
 static void init_operation_query () {
-    CU_ASSERT_FATAL (_child == 0);
 #ifdef _WIN32
-	fprintf (stderr, "TODO: %s (%d)\n", __FUNCTION__, __LINE__);
-	// TODO
-	_child = INVALID_HANDLE_VALUE;
+	TCHAR szExecutable[MAX_PATH];
+	TCHAR szParams[] = TEXT ("test.exe fork init_operation_query");
+	STARTUPINFO si;
+	PROCESS_INFORMATION pi;
+#endif /* ifdef _WIN32 */
+    CU_ASSERT (_child == 0);
+    // Start a child process
+#ifdef _WIN32
+	ZeroMemory (&si, sizeof (si));
+	si.cb = sizeof (si);
+	if (GetModuleFileName (NULL, szExecutable, sizeof (szExecutable) / sizeof (TCHAR))
+	 && CreateProcess (szExecutable, szParams, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi)) {
+		_child = pi.hProcess;
+		CloseHandle (pi.hThread);
+	} else {
+		_child = INVALID_HANDLE_VALUE;
+	}
 #else /* ifdef _WIN32 */
     _child = fork ();
-    if (!_child) {
-        sleep (30);
-        fprintf (stderr, "Child process %u from %s was not killed\n", getpid (), __FILE__);
-        exit (0);
-	}
+    if (!_child) exit (_fork_init_operation_query ());
 #endif /* ifdef _WIN32 */
     CU_ASSERT (_child != _WIN32_OR_POSIX (INVALID_HANDLE_VALUE, (pid_t)-1));
     CU_ASSERT_FATAL (params_v (2, "query", "./src/unittest") == 0);
@@ -48,7 +63,7 @@ static void do_operation_query () {
 #endif /* ifndef _WIN32 */
     CU_ASSERT_FATAL (_child != 0);
     // Initial query fails; info file not written
-    CU_ASSERT (operation_query () == ESRCH);
+    CU_ASSERT (operation_query () == _WIN32_OR_POSIX (ERROR_NOT_FOUND, ESRCH));
     // Write the info file and the query succeeds
     CU_ASSERT (process_save (_child) == 0);
     CU_ASSERT (operation_query () == 0);
@@ -61,7 +76,7 @@ static void do_operation_query () {
     CU_ASSERT (waitpid (_child, &status, 0) == _child);
 #endif /* ifdef _WIN32 */
     _child = 0;
-    CU_ASSERT (operation_query () == ESRCH);
+    CU_ASSERT (operation_query () == _WIN32_OR_POSIX (ERROR_NOT_FOUND, ESRCH));
     // Tidy up
     CU_ASSERT (process_housekeep () == 0);
 }

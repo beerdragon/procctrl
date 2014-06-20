@@ -13,8 +13,7 @@
 #include "process.h"
 #include "params.h"
 #ifdef _WIN32
-# include <strsafe.h>
-# define snprintf StringCchPrintfA
+# define snprintf _snprintf
 #else
 # include <errno.h>
 # include <dirent.h>
@@ -51,7 +50,15 @@ static int verify_pid (
 	_WIN32_OR_POSIX (DWORD, pid_t) process ///<the PID to search for>
     ) {
 #ifdef _WIN32
-	return 0;
+	HANDLE hProcess = OpenProcess (PROCESS_QUERY_INFORMATION | SYNCHRONIZE, FALSE, process);
+	if (hProcess != NULL) {
+		BOOL bTerminated = (WaitForSingleObject (hProcess, 0) == WAIT_OBJECT_0);
+		CloseHandle (hProcess);
+		// TODO: Check the command line
+		return !bTerminated;
+	} else {
+		return 0;
+	}
 #else /* ifdef _WIN32 */
     FILE *cmdline;
     char tmp[32];
@@ -119,7 +126,7 @@ static void lock_data_dir () {
     size = strlen (data_dir) + 7;
     path = (char*)malloc (size);
     if (!path) abort ();
-    sprintf (path, "%s/.lock", data_dir);
+    sprintf (path, "%s" _WIN32_OR_POSIX ("\\", "/") ".lock", data_dir);
 #ifdef _WIN32
 	_lock_handle = CreateFile (path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
 #else /* ifdef _WIN32 */
@@ -151,7 +158,7 @@ static void unlock_data_dir () {
         size = strlen (data_dir) + 7;
         path = (char*)malloc (size);
         if (!path) abort ();
-        sprintf (path, "%s/.lock", data_dir);
+        sprintf (path, "%s" _WIN32_OR_POSIX ("\\", "/") ".lock", data_dir);
 		_WIN32_OR_POSIX (DeleteFile, unlink) (path);
         free (path);
     }
@@ -160,6 +167,22 @@ static void unlock_data_dir () {
 #undef _LOCK_VALID
 
 #define _name(ent) _WIN32_OR_POSIX (ent.cFileName, ent->d_name)
+
+#ifdef _WIN32
+static HANDLE _FindFirstFileAny (const char *pszPath, WIN32_FIND_DATA *wfd) {
+	HANDLE hSearch;
+	size_t cchPath = strlen (pszPath);
+	char *pszSearch = (char*)malloc (cchPath + 5);
+	if (!pszSearch) {
+		SetLastError (ERROR_OUTOFMEMORY);
+		return INVALID_HANDLE_VALUE;
+	}
+	sprintf (pszSearch, "%s\\*.*", pszPath);
+	hSearch = FindFirstFile(pszSearch, wfd);
+	free (pszSearch);
+	return hSearch;
+}
+#endif /* ifdef _WIN32 */
 
 /// @brief Cleans up the data folder
 ///
@@ -173,7 +196,7 @@ int process_housekeep () {
 	_WIN32_OR_POSIX (WIN32_FIND_DATA, struct dirent*) ent;
     if (verbose) fprintf (stdout, "Cleaning up data area (%s)\n", data_dir);
 #ifdef _WIN32
-	dir = FindFirstFile (data_dir, &ent);
+	dir = _FindFirstFileAny (data_dir, &ent);
 	if (dir == INVALID_HANDLE_VALUE) {
 		DWORD err = GetLastError ();
 		if (err == ERROR_FILE_NOT_FOUND) {
@@ -203,7 +226,7 @@ int process_housekeep () {
             unlock_data_dir ();
             return _WIN32_OR_POSIX (ERROR_OUTOFMEMORY, ENOMEM);
         }
-        sprintf (dirpath, "%s/%s", data_dir, _name (ent));
+        sprintf (dirpath, "%s" _WIN32_OR_POSIX ("\\", "/") "%s", data_dir, _name (ent));
         if (isdigit (*_name (ent))) {
             _WIN32_OR_POSIX (DWORD, pid_t) ppid = _WIN32_OR_POSIX ((DWORD), (pid_t))strtol (_name (ent), NULL, 10);
 #ifdef _WIN32
@@ -214,7 +237,7 @@ int process_housekeep () {
 #endif /* ifdef _WIN32 */
                 if (verbose) fprintf (stdout, "Deleting %s - invalid\n", dirpath);
 #ifdef _WIN32
-				subdir = FindFirstFile (dirpath, &ent);
+				subdir = _FindFirstFileAny (dirpath, &ent);
 				if (subdir != INVALID_HANDLE_VALUE) {
 					do {
 #else /* ifdef _WIN32 */
@@ -229,7 +252,7 @@ int process_housekeep () {
                         size = strlen (_name (ent)) + strlen (dirpath) + 2;
                         subdirpath = (char*)malloc (size);
                         if (subdirpath) {
-                            sprintf (subdirpath, "%s/%s", dirpath, _name (ent));
+                            sprintf (subdirpath, "%s" _WIN32_OR_POSIX ("\\", "/") "%s", dirpath, _name (ent));
 							_WIN32_OR_POSIX (DeleteFile, unlink) (subdirpath);
                             free (subdirpath);
                         }
@@ -250,7 +273,7 @@ int process_housekeep () {
             }
         }
 #ifdef _WIN32
-		subdir = FindFirstFile (dirpath, &ent);
+		subdir = _FindFirstFileAny (dirpath, &ent);
 		if (subdir != INVALID_HANDLE_VALUE) {
 #else /* ifdef _WIN32 */
         subdir = opendir (dirpath);
@@ -272,7 +295,7 @@ int process_housekeep () {
                 if (subdirpath) {
                     FILE *info;
                     char *tmp;
-                    sprintf (subdirpath, "%s/%s", dirpath, _name (ent));
+                    sprintf (subdirpath, "%s" _WIN32_OR_POSIX ("\\", "/") "%s", dirpath, _name (ent));
                     info = fopen (subdirpath, "rt");
                     if (info) {
                         tmp = (char*)malloc (MAX_PROCESS_INFO_LINE);
@@ -291,7 +314,7 @@ int process_housekeep () {
                                 if (verbose) fprintf (stdout, "Deleting %s - invalid\n", subdirpath);
                                 fclose (info);
                                 info = NULL;
-                                _WIN32_OR_POSIX (RemoveDirectory, unlink) (subdirpath);
+                                _WIN32_OR_POSIX (DeleteFile, unlink) (subdirpath);
                                 files--;
                             }
                             if (cmdline) free (cmdline);
@@ -389,10 +412,10 @@ static void create_path (
     if (!copy) abort ();
     ptr = copy;
     while (*ptr) {
-        if (*ptr == '/') {
+        if (*ptr == _WIN32_OR_POSIX ('\\', '/')) {
             *ptr = 0;
             _WIN32_OR_POSIX (CreateDirectory (copy, NULL), mkdir (copy, 0755));
-            *ptr = '/';
+            *ptr = _WIN32_OR_POSIX ('\\', '/');
         }
         ptr++;
     }
@@ -440,7 +463,9 @@ static char *get_process_path (
     buffer_len += global_identifier ? 6 : pidlen (_WIN32_OR_POSIX (GetProcessId (parent_process), parent_process));
     path = (char*)malloc (buffer_len);
     if (!path) abort ();
-    n = global_identifier ? snprintf (path, buffer_len, "%s/%s/", data_dir, "GLOBAL") : snprintf (path, buffer_len, "%s/%u/", data_dir, _WIN32_OR_POSIX (GetProcessId (parent_process), parent_process));
+    n = global_identifier
+		? snprintf (path, buffer_len, "%s" _WIN32_OR_POSIX ("\\", "/") "%s" _WIN32_OR_POSIX ("\\", "/"), data_dir, "GLOBAL")
+		: snprintf(path, buffer_len, "%s" _WIN32_OR_POSIX("\\", "/") "%u" _WIN32_OR_POSIX("\\", "/"), data_dir, _WIN32_OR_POSIX(GetProcessId(parent_process), parent_process));
     if (n < 0) abort ();
     if (create) create_path (path);
     copy_process_identifier (path + n, buffer_len - n);
@@ -486,7 +511,7 @@ _WIN32_OR_POSIX (HANDLE, pid_t) process_find () {
     }
     unlock_data_dir ();
     free (path);
-    return _WIN32_OR_POSIX (OpenProcess (PROCESS_QUERY_INFORMATION, FALSE, pid), pid);
+    return _WIN32_OR_POSIX (OpenProcess (PROCESS_QUERY_INFORMATION | PROCESS_TERMINATE | SYNCHRONIZE, FALSE, pid), pid);
 }
 
 /// @brief Writes an information file for the controlled process

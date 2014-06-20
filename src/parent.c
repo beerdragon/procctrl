@@ -6,6 +6,9 @@
  */
 
 #include "parent.h"
+#ifdef _WIN32
+# include <Tlhelp32.h>
+#endif /* ifdef _WIN32 */
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -17,14 +20,30 @@
 _WIN32_OR_POSIX (HANDLE, pid_t) get_parent (
 	_WIN32_OR_POSIX (HANDLE, pid_t) process ///<the process to query>
 	) {
+	_WIN32_OR_POSIX (HANDLE, pid_t) parent = _WIN32_OR_POSIX (INVALID_HANDLE_VALUE, (pid_t)-1);
 #ifdef _WIN32
-	fprintf (stderr, "TODO: %s (%d)\n", __FUNCTION__, __LINE__);
-	// TODO
-	return INVALID_HANDLE_VALUE;
+	HANDLE hSnapshot;
+	hSnapshot = CreateToolhelp32Snapshot (TH32CS_SNAPPROCESS, 0);
+	if (hSnapshot != INVALID_HANDLE_VALUE) {
+		DWORD dwProcess = GetProcessId (process);
+		PROCESSENTRY32 pe;
+		printf ("Finding parent for %u\n", dwProcess);
+		ZeroMemory (&pe, sizeof (pe));
+		pe.dwSize = sizeof (pe);
+		if (Process32First (hSnapshot, &pe)) {
+			do {
+				if (pe.th32ProcessID == dwProcess) {
+					parent = OpenProcess (PROCESS_QUERY_INFORMATION | SYNCHRONIZE, FALSE, pe.th32ParentProcessID);
+					printf("Found parent %u\n", pe.th32ParentProcessID);
+					break;
+				}
+			} while (Process32Next (hSnapshot, &pe));
+		}
+		CloseHandle (hSnapshot);
+	}
 #else /* ifdef _WIN32 */
     char tmp[32];
     FILE *status;
-    pid_t parent = (pid_t)-1;
     if (snprintf (tmp, sizeof (tmp), "/proc/%u/status", process) < 32) {
         status = fopen (tmp, "rt");
         if (status) {
@@ -36,6 +55,6 @@ _WIN32_OR_POSIX (HANDLE, pid_t) get_parent (
             fclose (status);
         }
     }
-    return parent;
 #endif /* ifdef _WIN32 */
+    return parent;
 }
